@@ -1,0 +1,1780 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>RotaPark — Estacionamento Rotativo</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+          colors: {
+            brand: {
+              dark: '#0F172A',
+              navy: '#1E3A8A',
+              blue: '#2563EB',
+              light: '#EFF6FF',
+            },
+            ml: {
+              bg: '#F5F5F5',
+              blue: '#3483FA',
+              green: '#00A650',
+              yellow: '#FFE600',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    /* Custom scrollbar inside mobile viewport */
+    .phone-scroll::-webkit-scrollbar {
+      width: 4px;
+    }
+    .phone-scroll::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    .phone-scroll::-webkit-scrollbar-thumb {
+      background: rgba(148, 163, 184, 0.4);
+      border-radius: 9999px;
+    }
+    @keyframes slideDown {
+      from { transform: translateY(-100%); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+    @keyframes pulseRing {
+      0% { transform: scale(0.95); opacity: 0.7; }
+      70% { transform: scale(1.1); opacity: 0; }
+      100% { transform: scale(0.95); opacity: 0; }
+    }
+    .animate-push {
+      animation: slideDown 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+    .pulse-ring {
+      animation: pulseRing 2s infinite;
+    }
+    .map-street {
+      transition: all 0.25s ease;
+      cursor: pointer;
+    }
+    .map-street:hover {
+      filter: brightness(1.08);
+    }
+  </style>
+</head>
+<body class="bg-slate-900 min-h-screen flex flex-col items-center justify-center p-0 sm:p-4 font-sans antialiased text-slate-800 select-none">
+
+  <!-- Barra Superior Auxiliar (Apenas Desktop para facilitar testes do fluxograma) -->
+  <div class="hidden sm:flex items-center justify-between w-full max-w-[412px] mb-2.5 px-2 text-xs text-slate-300">
+    <div class="flex items-center gap-1.5">
+      <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+      <span class="font-medium">Protótipo Interativo • Fluxograma</span>
+    </div>
+    <div class="flex items-center gap-2">
+      <button onclick="fillDemoAccount()" class="px-2.5 py-1 rounded-full bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-700 transition font-medium">
+        ⚡ Demo Rápida
+      </button>
+      <button onclick="resetFullApp()" class="px-2.5 py-1 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition">
+        Reiniciar
+      </button>
+    </div>
+  </div>
+
+  <!-- Smartphone Frame -->
+  <div id="phone-frame" class="relative w-full sm:w-[412px] h-[100dvh] sm:h-[844px] bg-slate-50 sm:rounded-[44px] sm:border-[10px] sm:border-slate-800 shadow-2xl overflow-hidden flex flex-col">
+
+    <!-- Status Bar do Celular -->
+    <div id="status-bar" class="bg-slate-900 text-white px-6 pt-2.5 pb-2 flex items-center justify-between text-xs font-semibold z-30 shrink-0">
+      <span id="clock-time">20:40</span>
+      <!-- Notch decorativo no desktop -->
+      <div class="hidden sm:block w-24 h-4 bg-black rounded-full"></div>
+      <div class="flex items-center gap-1.5">
+        <!-- Demo button on mobile screens -->
+        <button onclick="fillDemoAccount()" class="sm:hidden text-[10px] bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded-full border border-amber-400/30 mr-1">
+          Demo
+        </button>
+        <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M12 21L15.6 16.2C14.6 15.45 13.35 15 12 15C10.65 15 9.4 15.45 8.4 16.2L12 21ZM12 3C7.95 3 4.21 4.34 1.2 6.6L3 9C5.5 7.12 8.62 6 12 6C15.38 6 18.5 7.12 21 9L22.8 6.6C19.79 4.34 16.05 3 12 3ZM12 9C9.3 9 6.81 9.89 4.8 11.4L6.6 13.8C8.1 12.67 9.97 12 12 12C14.03 12 15.9 12.67 17.4 13.8L19.2 11.4C17.19 9.89 14.7 9 12 9Z"/></svg>
+        <div class="flex items-center gap-0.5">
+          <div class="w-5 h-2.5 border border-white/80 rounded-sm p-[1px] flex items-center">
+            <div class="w-4 h-full bg-emerald-400 rounded-[1px]"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Notificação Push Flutuante (Aparece ao gerar ticket ou avisos importantes) -->
+    <div id="push-notification" class="hidden absolute top-11 left-3 right-3 z-50 bg-slate-900/95 backdrop-blur-md text-white p-3.5 rounded-2xl shadow-xl border border-slate-700/80 animate-push">
+      <div class="flex items-start gap-3">
+        <div class="w-9 h-9 rounded-xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center shrink-0 mt-0.5">
+          <svg class="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        </div>
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center justify-between">
+            <span class="text-[11px] font-bold uppercase tracking-wider text-emerald-400">RotaPark • Ticket Ativo</span>
+            <button onclick="hidePushNotification()" class="text-slate-400 hover:text-white text-xs">✕</button>
+          </div>
+          <p id="push-message" class="text-xs text-slate-100 font-medium mt-0.5 leading-snug">
+            Ticket gerado com sucesso! Comprovante enviado no app e por e-mail.
+          </p>
+          <div class="mt-1.5 inline-flex items-center gap-1.5 bg-slate-800 px-2.5 py-1 rounded-lg border border-slate-700">
+            <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+            <span class="text-[11px] text-slate-300">Tempo restante:</span>
+            <span id="push-timer" class="font-mono text-xs font-bold text-amber-400">02:00:00</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Toast de Feedback Rápido -->
+    <div id="toast" class="hidden absolute bottom-20 left-4 right-4 z-50 bg-slate-900 text-white text-xs font-medium px-4 py-3 rounded-xl shadow-lg flex items-center gap-2.5 border border-slate-700 transition-all">
+      <span id="toast-icon">ℹ️</span>
+      <span id="toast-text" class="flex-1">Mensagem</span>
+    </div>
+
+    <!-- ========================================================= -->
+    <!-- TELA 1: LOGIN (INÍCIO DO APP)                             -->
+    <!-- ========================================================= -->
+    <section id="screen-login" class="flex-1 flex flex-col justify-between bg-white phone-scroll overflow-y-auto px-6 py-6">
+      <div>
+        <!-- Logo do App -->
+        <div class="flex flex-col items-center text-center mt-2 mb-6">
+          <div class="relative w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-900 flex items-center justify-center shadow-lg shadow-blue-600/25 mb-3">
+            <svg class="w-9 h-9 text-white" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
+              <path stroke-linecap="round" stroke-linejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
+            </svg>
+            <span class="absolute -bottom-1 -right-1 bg-amber-400 text-slate-900 text-[10px] font-extrabold px-1.5 py-0.5 rounded-md shadow">P</span>
+          </div>
+          <h1 class="text-2xl font-extrabold tracking-tight text-slate-900">Rota<span class="text-blue-600">Park</span></h1>
+          <p class="text-xs text-slate-500 mt-0.5">Estacionamento Rotativo Inteligente</p>
+        </div>
+
+        <!-- Formulário de Login -->
+        <form id="login-form" onsubmit="handleLogin(event)" class="space-y-3.5">
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">E-mail</label>
+            <div class="relative">
+              <input id="login-email" type="email" required placeholder="seuemail@exemplo.com"
+                class="w-full pl-10 pr-3.5 py-3 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-600 focus:bg-white transition" />
+              <svg class="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+              </svg>
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Senha</label>
+            <div class="relative">
+              <input id="login-password" type="password" required placeholder="••••••••"
+                class="w-full pl-10 pr-10 py-3 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-600 focus:bg-white transition" />
+              <svg class="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+              </svg>
+              <button type="button" onclick="togglePasswordVisibility('login-password')" class="absolute right-3 top-3 text-slate-400 hover:text-slate-600 p-0.5">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          <div id="login-error" class="hidden text-xs text-red-600 bg-red-50 border border-red-200 rounded-xl px-3 py-2 font-medium"></div>
+
+          <button type="submit" class="w-full py-3.5 bg-blue-600 hover:bg-blue-700 active:scale-[0.99] text-white font-bold text-sm rounded-xl shadow-md shadow-blue-600/20 transition">
+            Entrar
+          </button>
+        </form>
+
+        <!-- Links menores: Cadastrar e Esqueci Senha -->
+        <div class="flex items-center justify-between mt-3.5 px-1">
+          <button type="button" onclick="navigateTo('screen-register-user')" class="text-xs font-semibold text-blue-600 hover:text-blue-800 transition">
+            Não tem conta? <span class="underline">Cadastrar</span>
+          </button>
+          <button type="button" onclick="openModal('modal-forgot-password')" class="text-xs font-medium text-slate-500 hover:text-slate-800 transition">
+            Esqueci senha
+          </button>
+        </div>
+      </div>
+
+      <!-- Login Social (Google, Facebook, Outlook) -->
+      <div class="mt-6 pt-4 border-t border-slate-100">
+        <p class="text-[11px] text-center font-medium text-slate-400 uppercase tracking-wider mb-3">Ou acesse com</p>
+        <div class="grid grid-cols-3 gap-2.5">
+          <!-- Google -->
+          <button type="button" onclick="socialLogin('Google')" class="flex items-center justify-center gap-1.5 py-2.5 px-2 bg-white hover:bg-slate-50 border border-slate-200 rounded-xl shadow-sm transition active:scale-95">
+            <svg class="w-4 h-4" viewBox="0 0 24 24">
+              <path fill="#EA4335" d="M12 5c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 1.79 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.91 6.16-4.91z"/>
+              <path fill="#4285F4" d="M23.49 12.27c0-.79-.07-1.54-.19-2.27H12v4.51h6.47c-.29 1.48-1.14 2.73-2.4 3.58v3h3.86c2.26-2.09 3.56-5.17 3.56-8.82z"/>
+              <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+              <path fill="#34A853" d="M12 23c3.24 0 5.95-1.08 7.93-2.91l-3.86-3c-1.08.72-2.45 1.16-4.07 1.16-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+            </svg>
+            <span class="text-xs font-semibold text-slate-700">Google</span>
+          </button>
+
+          <!-- Facebook -->
+          <button type="button" onclick="socialLogin('Facebook')" class="flex items-center justify-center gap-1.5 py-2.5 px-2 bg-[#1877F2] hover:bg-[#166FE5] text-white rounded-xl shadow-sm transition active:scale-95">
+            <svg class="w-4 h-4 fill-current" viewBox="0 0 24 24">
+              <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+            </svg>
+            <span class="text-xs font-semibold">Facebook</span>
+          </button>
+
+          <!-- Outlook -->
+          <button type="button" onclick="socialLogin('Outlook')" class="flex items-center justify-center gap-1.5 py-2.5 px-2 bg-[#0078D4] hover:bg-[#006CBE] text-white rounded-xl shadow-sm transition active:scale-95">
+            <svg class="w-4 h-4 fill-current" viewBox="0 0 24 24">
+              <path d="M1 17L1 7L13 4V20L1 17ZM14 6H22C22.55 6 23 6.45 23 7V17C23 17.55 22.55 18 22 18H14V6ZM7 9.5C5.62 9.5 4.5 10.62 4.5 12C4.5 13.38 5.62 14.5 7 14.5C8.38 14.5 9.5 13.38 9.5 12C9.5 10.62 8.38 9.5 7 9.5Z"/>
+            </svg>
+            <span class="text-xs font-semibold">Outlook</span>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========================================================= -->
+    <!-- TELA 2: CADASTRO DE USUÁRIO                               -->
+    <!-- ========================================================= -->
+    <section id="screen-register-user" class="hidden flex-1 flex flex-col bg-slate-50 overflow-hidden">
+      <!-- Header -->
+      <div class="bg-white px-5 py-3.5 border-b border-slate-200 flex items-center gap-3 shrink-0">
+        <button type="button" onclick="navigateTo('screen-login')" class="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-700">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>
+        </button>
+        <div>
+          <h2 class="text-base font-bold text-slate-900">Criar Conta</h2>
+          <p class="text-[11px] text-slate-500">Preencha seus dados para acessar o RotaPark</p>
+        </div>
+      </div>
+
+      <!-- Formulário -->
+      <form id="register-user-form" onsubmit="handleRegisterUser(event)" class="flex-1 phone-scroll overflow-y-auto px-5 py-4 space-y-3">
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Nome Completo *</label>
+          <input id="reg-name" type="text" required placeholder="Ex: Alessandro Silva"
+            class="w-full px-3.5 py-2.5 text-sm bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-600" />
+        </div>
+
+        <div class="grid grid-cols-2 gap-2.5">
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">CPF *</label>
+            <input id="reg-cpf" type="text" required maxlength="14" oninput="maskCPF(this)" placeholder="000.000.000-00"
+              class="w-full px-3 py-2.5 text-sm bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-600" />
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Telefone *</label>
+            <input id="reg-phone" type="text" required maxlength="15" oninput="maskPhone(this)" placeholder="(00) 00000-0000"
+              class="w-full px-3 py-2.5 text-sm bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-600" />
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">E-mail *</label>
+          <input id="reg-email" type="email" required placeholder="seuemail@exemplo.com"
+            class="w-full px-3.5 py-2.5 text-sm bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-600" />
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">CEP *</label>
+          <input id="reg-cep" type="text" required maxlength="9" oninput="maskCEP(this)" placeholder="00000-000"
+            class="w-full px-3.5 py-2.5 text-sm bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-600" />
+        </div>
+
+        <div class="grid grid-cols-2 gap-2.5">
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Senha *</label>
+            <input id="reg-pass" type="password" required minlength="4" placeholder="••••••••"
+              class="w-full px-3 py-2.5 text-sm bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-600" />
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Confirmar Senha *</label>
+            <input id="reg-pass-confirm" type="password" required minlength="4" placeholder="••••••••"
+              class="w-full px-3 py-2.5 text-sm bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-600" />
+          </div>
+        </div>
+
+        <div id="reg-user-error" class="hidden text-xs text-red-600 bg-red-50 border border-red-200 rounded-xl px-3 py-2 font-medium"></div>
+
+        <!-- Botões Concluir Cadastro e Cancelar -->
+        <div class="pt-3 flex gap-2.5">
+          <button type="button" onclick="navigateTo('screen-login')" class="flex-1 py-3 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold text-xs rounded-xl transition">
+            Cancelar
+          </button>
+          <button type="submit" class="flex-[2] py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-md shadow-blue-600/20 transition">
+            Concluir Cadastro
+          </button>
+        </div>
+      </form>
+    </section>
+
+    <!-- ========================================================= -->
+    <!-- TELA 3: CADASTRO DE VEÍCULO                               -->
+    <!-- ========================================================= -->
+    <section id="screen-register-vehicle" class="hidden flex-1 flex flex-col bg-slate-50 overflow-hidden">
+      <!-- Header -->
+      <div class="bg-white px-5 py-3.5 border-b border-slate-200 flex items-center justify-between shrink-0">
+        <div class="flex items-center gap-3">
+          <button id="btn-back-vehicle" type="button" onclick="cancelVehicleScreen()" class="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-700">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>
+          </button>
+          <div>
+            <h2 class="text-base font-bold text-slate-900">Cadastro de Veículo</h2>
+            <p class="text-[11px] text-slate-500">Informe o veículo e os dados do titular</p>
+          </div>
+        </div>
+      </div>
+
+      <form id="register-vehicle-form" onsubmit="handleRegisterVehicle(event)" class="flex-1 phone-scroll overflow-y-auto px-5 py-4 space-y-4">
+        <!-- Preview Mini Placa Mercosul -->
+        <div class="bg-white border-2 border-slate-800 rounded-xl overflow-hidden shadow-sm max-w-[210px] mx-auto">
+          <div class="bg-blue-700 text-white text-[9px] font-bold px-2.5 py-0.5 flex items-center justify-between tracking-wider">
+            <span>BRASIL</span>
+            <span class="text-[8px] opacity-80">MERCOSUL</span>
+          </div>
+          <div id="plate-preview" class="text-center font-mono text-xl font-extrabold tracking-widest py-1.5 text-slate-900 bg-white">
+            ABC1D23
+          </div>
+        </div>
+
+        <!-- Seção 1: Dados do Veículo -->
+        <div class="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-sm space-y-3">
+          <h3 class="text-xs font-bold uppercase tracking-wider text-blue-700 flex items-center gap-1.5">
+            <span>🚗</span> Dados do Veículo
+          </h3>
+
+          <div class="grid grid-cols-2 gap-2.5">
+            <div>
+              <label class="block text-xs font-semibold text-slate-700 mb-1">Placa *</label>
+              <input id="veh-plate" type="text" required maxlength="8" oninput="updatePlatePreview(this)" placeholder="ABC1D23"
+                class="w-full px-3 py-2 text-sm font-mono uppercase bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-600" />
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-700 mb-1">Cor *</label>
+              <input id="veh-color" type="text" required placeholder="Ex: Prata"
+                class="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-600" />
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Modelo do Veículo *</label>
+            <input id="veh-model" type="text" required placeholder="Ex: Fiat Argo 1.0 / Honda Civic"
+              class="w-full px-3.5 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-600" />
+          </div>
+        </div>
+
+        <!-- Seção 2: Dados do Titular -->
+        <div class="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-sm space-y-3">
+          <div class="flex items-center justify-between">
+            <h3 class="text-xs font-bold uppercase tracking-wider text-blue-700 flex items-center gap-1.5">
+              <span>👤</span> Dados do Titular
+            </h3>
+            <button type="button" onclick="autofillOwnerData()" class="text-[11px] font-semibold text-blue-600 hover:underline bg-blue-50 px-2 py-0.5 rounded-md">
+              Usar meus dados
+            </button>
+          </div>
+
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Nome do Titular *</label>
+            <input id="owner-name" type="text" required placeholder="Nome completo do proprietário"
+              class="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-600" />
+          </div>
+
+          <div class="grid grid-cols-2 gap-2.5">
+            <div>
+              <label class="block text-xs font-semibold text-slate-700 mb-1">CPF *</label>
+              <input id="owner-cpf" type="text" required maxlength="14" oninput="maskCPF(this)" placeholder="000.000.000-00"
+                class="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-600" />
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-700 mb-1">Telefone *</label>
+              <input id="owner-phone" type="text" required maxlength="15" oninput="maskPhone(this)" placeholder="(00) 00000-0000"
+                class="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-600" />
+            </div>
+          </div>
+
+          <div class="grid grid-cols-3 gap-2.5">
+            <div class="col-span-2">
+              <label class="block text-xs font-semibold text-slate-700 mb-1">E-mail *</label>
+              <input id="owner-email" type="email" required placeholder="titular@email.com"
+                class="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-600" />
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-700 mb-1">CEP *</label>
+              <input id="owner-cep" type="text" required maxlength="9" oninput="maskCEP(this)" placeholder="00000-000"
+                class="w-full px-2.5 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-600" />
+            </div>
+          </div>
+        </div>
+
+        <div id="reg-veh-error" class="hidden text-xs text-red-600 bg-red-50 border border-red-200 rounded-xl px-3 py-2 font-medium"></div>
+
+        <!-- Botões Salvar Cadastro e Cancelar -->
+        <div class="pt-1 pb-3 flex gap-2.5">
+          <button type="button" onclick="cancelVehicleScreen()" class="flex-1 py-3 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold text-xs rounded-xl transition">
+            Cancelar
+          </button>
+          <button type="submit" class="flex-[2] py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-md shadow-blue-600/20 transition">
+            Salvar Cadastro
+          </button>
+        </div>
+      </form>
+    </section>
+
+    <!-- ========================================================= -->
+    <!-- TELA 4: TELA INICIAL (MAPA + 5 RUAS + BOTÃO "i")          -->
+    <!-- ========================================================= -->
+    <section id="screen-home" class="hidden flex-1 flex flex-col bg-slate-100 overflow-hidden">
+      <!-- Top Header Azul Marinho -->
+      <div class="bg-gradient-to-r from-slate-900 to-blue-950 text-white px-4 pt-3 pb-3.5 shrink-0">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2.5">
+            <div class="w-9 h-9 rounded-full bg-blue-600 flex items-center justify-center font-bold text-sm shadow">
+              <span id="home-user-initial">A</span>
+            </div>
+            <div>
+              <p class="text-[11px] text-blue-200">Olá, <span id="home-user-name" class="font-semibold text-white">Motorista</span></p>
+              <button onclick="navigateTo('screen-register-vehicle')" class="flex items-center gap-1.5 text-xs font-mono font-bold bg-white/10 hover:bg-white/20 px-2 py-0.5 rounded-md mt-0.5 transition">
+                <span id="home-vehicle-plate">ABC1D23</span>
+                <span class="text-[10px] font-sans font-normal text-slate-300 truncate max-w-[110px]" id="home-vehicle-model">• Veículo</span>
+                <span class="text-[10px] text-amber-300">✎</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <!-- Ícone de Informação "i" das Regras -->
+            <button onclick="openModal('modal-rules')" title="Regras do Estacionamento"
+              class="w-8 h-8 rounded-full bg-amber-400 hover:bg-amber-300 text-slate-900 font-serif font-extrabold text-sm flex items-center justify-center shadow-md transition active:scale-95">
+              i
+            </button>
+            <!-- Botão Sair -->
+            <button onclick="logoutUser()" title="Sair da conta"
+              class="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-slate-200 flex items-center justify-center transition">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- Barra de Fidelidade (Bônus +30min a cada 5 compras) -->
+        <div class="mt-3 bg-white/10 backdrop-blur-sm rounded-xl p-2.5 flex items-center justify-between border border-white/10">
+          <div class="flex items-center gap-2">
+            <span class="text-base">🎁</span>
+            <div>
+              <p class="text-[11px] font-bold text-amber-300">Bônus +30 min: <span id="home-bonus-count" class="text-white">0</span> disponível(is)</p>
+              <p class="text-[10px] text-slate-300">Progresso: <span id="home-loyalty-progress" class="font-bold text-white">0/5</span> compras para próximo bônus</p>
+            </div>
+          </div>
+          <!-- Mini barra de progresso 5 bolinhas -->
+          <div id="home-loyalty-dots" class="flex items-center gap-1">
+            <span class="w-2.5 h-2.5 rounded-full bg-white/20"></span>
+            <span class="w-2.5 h-2.5 rounded-full bg-white/20"></span>
+            <span class="w-2.5 h-2.5 rounded-full bg-white/20"></span>
+            <span class="w-2.5 h-2.5 rounded-full bg-white/20"></span>
+            <span class="w-2.5 h-2.5 rounded-full bg-white/20"></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Conteúdo Rolável: Mini Mapa + 5 Caixas de Ruas -->
+      <div class="flex-1 phone-scroll overflow-y-auto px-4 py-3 space-y-3">
+
+        <!-- Banner de Ticket Ativo (se houver ticket rodando) -->
+        <div id="active-ticket-banner" onclick="openModal('modal-active-ticket')" class="hidden cursor-pointer bg-emerald-600 text-white rounded-2xl p-3 shadow-md flex items-center justify-between">
+          <div class="flex items-center gap-2.5">
+            <div class="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center">⏱️</div>
+            <div>
+              <p class="text-xs font-bold">Ticket Ativo • <span id="banner-street-name">Rua 1</span></p>
+              <p class="text-[10px] text-emerald-100">Toque para ver comprovante</p>
+            </div>
+          </div>
+          <div class="text-right">
+            <span id="banner-timer" class="font-mono text-sm font-extrabold bg-slate-900/40 px-2.5 py-1 rounded-lg">02:00:00</span>
+          </div>
+        </div>
+
+        <!-- MINI MAPA DO ESTACIONAMENTO ROTATIVO -->
+        <div class="bg-white rounded-2xl p-2.5 border border-slate-200 shadow-sm">
+          <div class="flex items-center justify-between mb-1.5 px-1">
+            <span class="text-[11px] font-bold text-slate-700 flex items-center gap-1">
+              <span>🗺️</span> Mapa de Setores Rotativos
+            </span>
+            <span class="text-[10px] text-slate-400">Toque na rua ou na lista</span>
+          </div>
+
+          <!-- SVG Mini Mapa Interativo -->
+          <svg viewBox="0 0 360 155" class="w-full h-[145px] rounded-xl bg-slate-100 border border-slate-200/80">
+            <!-- Quarteirões / Fundo Urbano -->
+            <rect x="0" y="0" width="360" height="155" fill="#E2E8F0"/>
+            <!-- Áreas verdes / Praças -->
+            <rect x="14" y="14" width="54" height="36" rx="6" fill="#BBF7D0"/>
+            <rect x="286" y="102" width="60" height="40" rx="6" fill="#BBF7D0"/>
+            <!-- Quarteirões cinza claro -->
+            <rect x="85" y="14" width="75" height="36" rx="4" fill="#F8FAFC"/>
+            <rect x="178" y="14" width="90" height="36" rx="4" fill="#F8FAFC"/>
+            <rect x="286" y="14" width="60" height="36" rx="4" fill="#F8FAFC"/>
+            <rect x="14" y="66" width="54" height="24" rx="4" fill="#F8FAFC"/>
+            <rect x="178" y="66" width="90" height="24" rx="4" fill="#F8FAFC"/>
+            <rect x="286" y="66" width="60" height="24" rx="4" fill="#F8FAFC"/>
+            <rect x="14" y="104" width="54" height="38" rx="4" fill="#F8FAFC"/>
+            <rect x="85" y="104" width="75" height="38" rx="4" fill="#F8FAFC"/>
+            <rect x="178" y="104" width="90" height="38" rx="4" fill="#F8FAFC"/>
+
+            <!-- CENTRO DA CIDADE (Ponto de Referência) -->
+            <g transform="translate(85, 64)">
+              <rect x="0" y="0" width="75" height="28" rx="6" fill="#0F172A"/>
+              <text x="37.5" y="12" text-anchor="middle" fill="#FBBF24" font-size="7.5" font-weight="800" font-family="Inter">★ CENTRO</text>
+              <text x="37.5" y="22" text-anchor="middle" fill="#CBD5E1" font-size="6.5" font-family="Inter">Marco Zero</text>
+            </g>
+
+            <!-- RUA 1 (2h) - Mais próxima do Centro -->
+            <g id="map-street-1" onclick="selectStreet(1)" class="map-street">
+              <rect x="70" y="52" width="104" height="10" rx="3" fill="#2563EB"/>
+              <rect x="76" y="42" width="54" height="13" rx="4" fill="#1E40AF"/>
+              <text x="103" y="51" text-anchor="middle" fill="#FFFFFF" font-size="7.5" font-weight="700" font-family="Inter">Rua 1 • 2h</text>
+            </g>
+
+            <!-- RUA 2 (3h) -->
+            <g id="map-street-2" onclick="selectStreet(2)" class="map-street">
+              <rect x="163" y="14" width="11" height="128" rx="3" fill="#64748B"/>
+              <rect x="142" y="24" width="54" height="13" rx="4" fill="#334155"/>
+              <text x="169" y="33" text-anchor="middle" fill="#FFFFFF" font-size="7.5" font-weight="700" font-family="Inter">Rua 2 • 3h</text>
+            </g>
+
+            <!-- RUA 3 (4h) -->
+            <g id="map-street-3" onclick="selectStreet(3)" class="map-street">
+              <rect x="70" y="93" width="200" height="9" rx="3" fill="#64748B"/>
+              <rect x="186" y="83" width="54" height="13" rx="4" fill="#334155"/>
+              <text x="213" y="92" text-anchor="middle" fill="#FFFFFF" font-size="7.5" font-weight="700" font-family="Inter">Rua 3 • 4h</text>
+            </g>
+
+            <!-- RUA 4 (5h) -->
+            <g id="map-street-4" onclick="selectStreet(4)" class="map-street">
+              <rect x="271" y="14" width="11" height="128" rx="3" fill="#64748B"/>
+              <rect x="249" y="42" width="54" height="13" rx="4" fill="#334155"/>
+              <text x="276" y="51" text-anchor="middle" fill="#FFFFFF" font-size="7.5" font-weight="700" font-family="Inter">Rua 4 • 5h</text>
+            </g>
+
+            <!-- RUA 5 (6h) - Mais afastada do Centro -->
+            <g id="map-street-5" onclick="selectStreet(5)" class="map-street">
+              <rect x="285" y="52" width="62" height="10" rx="3" fill="#64748B"/>
+              <rect x="289" y="68" width="54" height="13" rx="4" fill="#334155"/>
+              <text x="316" y="77" text-anchor="middle" fill="#FFFFFF" font-size="7.5" font-weight="700" font-family="Inter">Rua 5 • 6h</text>
+            </g>
+          </svg>
+        </div>
+
+        <!-- 5 CAIXAS DAS RUAS (Nome, Distância do Centro e Tempo de Permanência) -->
+        <div>
+          <div class="flex items-center justify-between mb-2 px-1">
+            <h3 class="text-xs font-bold text-slate-800">Selecione o Setor / Rua</h3>
+            <span class="text-[11px] font-semibold text-blue-600">R$ 3,50 / ticket</span>
+          </div>
+
+          <div id="street-cards-container" class="space-y-2">
+            <!-- Preenchido via JS -->
+          </div>
+        </div>
+      </div>
+
+      <!-- Botão Inferior: Continuar para Pagamento -->
+      <div class="bg-white px-4 py-3 border-t border-slate-200 shrink-0">
+        <button onclick="goToCheckout()" class="w-full py-3.5 bg-blue-600 hover:bg-blue-700 active:scale-[0.99] text-white font-bold text-sm rounded-xl shadow-lg shadow-blue-600/20 flex items-center justify-center gap-2 transition">
+          <span>Continuar para Pagamento</span>
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+        </button>
+      </div>
+    </section>
+
+    <!-- ========================================================= -->
+    <!-- TELA 5: PAGAMENTO (ESTILO MERCADO LIVRE / MERCADO PAGO)   -->
+    <!-- ========================================================= -->
+    <section id="screen-payment" class="hidden flex-1 flex flex-col bg-[#F5F5F5] overflow-hidden">
+      <!-- Header Estilo Mercado Livre -->
+      <div class="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-4 py-3.5 flex items-center justify-between shrink-0 shadow-sm">
+        <div class="flex items-center gap-3">
+          <button type="button" onclick="navigateTo('screen-home')" class="w-8 h-8 rounded-full bg-white/15 hover:bg-white/25 flex items-center justify-center">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>
+          </button>
+          <div>
+            <h2 class="text-base font-bold leading-tight">Checkout</h2>
+            <p class="text-[11px] text-blue-100">Escolha a quantidade e como pagar</p>
+          </div>
+        </div>
+        <!-- Indicador de Tentativas do Fluxograma -->
+        <span id="attempt-badge" class="hidden text-[10px] font-bold bg-amber-400 text-slate-900 px-2 py-0.5 rounded-full">
+          Tentativa 1/3
+        </span>
+      </div>
+
+      <!-- Conteúdo do Checkout -->
+      <div class="flex-1 phone-scroll overflow-y-auto px-4 py-3.5 space-y-3">
+
+        <!-- CARD 1: Inventário de Tickets, Quantidade (+/-) e Valor -->
+        <div class="bg-white rounded-2xl p-4 shadow-sm border border-slate-200/70">
+          <div class="flex items-start justify-between pb-3 border-b border-slate-100">
+            <div>
+              <span class="inline-block text-[10px] font-bold uppercase tracking-wider bg-blue-50 text-blue-700 px-2 py-0.5 rounded-md mb-1" id="pay-street-badge">
+                Rua 1 • 2h por ticket
+              </span>
+              <h3 class="text-sm font-bold text-slate-900" id="pay-street-title">Rua 1 — Setor Central</h3>
+              <p class="text-[11px] text-slate-500 mt-0.5">Veículo: <span id="pay-vehicle-plate" class="font-mono font-semibold text-slate-700">ABC1D23</span></p>
+            </div>
+            <!-- Inventário de Tickets Bônus -->
+            <div class="text-right bg-amber-50 border border-amber-200/80 px-2.5 py-1.5 rounded-xl">
+              <p class="text-[10px] font-semibold text-amber-800">Inventário Bônus</p>
+              <p class="text-sm font-extrabold text-amber-600"><span id="pay-inventory-count">0</span> <span class="text-[10px] font-normal">ticket(s)</span></p>
+            </div>
+          </div>
+
+          <!-- Seletor de Quantidade de Tickets (+/-) e Valor -->
+          <div class="pt-3 flex items-center justify-between">
+            <div>
+              <p class="text-xs font-semibold text-slate-700">Quantidade de Tickets</p>
+              <p class="text-[11px] text-slate-500">Tempo total: <strong id="pay-total-duration" class="text-blue-700">2h 00min</strong></p>
+            </div>
+
+            <div class="flex items-center gap-3 bg-slate-100 p-1 rounded-xl border border-slate-200">
+              <button type="button" onclick="changeTicketQty(-1)" class="w-8 h-8 rounded-lg bg-white hover:bg-slate-50 text-blue-600 font-extrabold text-base shadow-sm flex items-center justify-center active:scale-95 transition">
+                −
+              </button>
+              <span id="pay-ticket-qty" class="w-6 text-center font-extrabold text-sm text-slate-900">1</span>
+              <button type="button" onclick="changeTicketQty(1)" class="w-8 h-8 rounded-lg bg-white hover:bg-slate-50 text-blue-600 font-extrabold text-base shadow-sm flex items-center justify-center active:scale-95 transition">
+                +
+              </button>
+            </div>
+          </div>
+
+          <div class="mt-3 pt-2.5 border-t border-dashed border-slate-200 flex items-center justify-between">
+            <span class="text-xs text-slate-500">Valor unitário: R$ 3,50</span>
+            <div class="text-right">
+              <span class="text-[11px] text-slate-500 mr-1">Total:</span>
+              <span id="pay-total-price" class="text-lg font-extrabold text-slate-900">R$ 3,50</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- CARD 2: Meios de Pagamento (Estilo Mercado Livre) -->
+        <div class="bg-white rounded-2xl p-4 shadow-sm border border-slate-200/70 space-y-2.5">
+          <h3 class="text-xs font-bold text-slate-800">Como você prefere pagar?</h3>
+
+          <!-- Opção PIX -->
+          <label onclick="selectPaymentMethod('pix')" class="flex items-center justify-between p-3 rounded-xl border-2 cursor-pointer transition" id="pm-option-pix">
+            <div class="flex items-center gap-3">
+              <div class="w-9 h-9 rounded-full bg-emerald-50 flex items-center justify-center shrink-0">
+                <!-- Ícone PIX -->
+                <svg class="w-5 h-5 text-[#00BFA5]" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M15.45 16.52L12 13.07L8.55 16.52C7.87 17.2 6.76 17.2 6.08 16.52L3.48 13.92C2.8 13.24 2.8 12.13 3.48 11.45L6.08 8.85C6.76 8.17 7.87 8.17 8.55 8.85L12 12.3L15.45 8.85C16.13 8.17 17.24 8.17 17.92 8.85L20.52 11.45C21.2 12.13 21.2 13.24 20.52 13.92L17.92 16.52C17.24 17.2 16.13 17.2 15.45 16.52Z"/>
+                </svg>
+              </div>
+              <div>
+                <p class="text-xs font-bold text-slate-900">Pix</p>
+                <p class="text-[11px] font-medium text-[#00A650]">Aprovação imediata</p>
+              </div>
+            </div>
+            <input type="radio" name="payment_method" value="pix" checked class="w-4 h-4 accent-[#3483FA]" />
+          </label>
+
+          <!-- Lista Dinâmica de Cartões Cadastrados -->
+          <div id="saved-cards-list" class="space-y-2">
+            <!-- Renderizado via JS -->
+          </div>
+
+          <!-- Botão Cadastrar Novo Cartão (Estilo Mercado Livre) -->
+          <button type="button" onclick="navigateTo('screen-register-card')"
+            class="w-full py-2.5 px-3 rounded-xl border border-dashed border-[#3483FA]/60 bg-blue-50/50 hover:bg-blue-50 text-[#3483FA] font-bold text-xs flex items-center justify-center gap-2 transition">
+            <span class="w-5 h-5 rounded-full bg-[#3483FA] text-white flex items-center justify-center text-sm leading-none">+</span>
+            <span>Cadastrar novo cartão</span>
+          </button>
+        </div>
+
+        <!-- CARD 3: Caixa para selecionar Bônus de +30 min -->
+        <div class="bg-white rounded-2xl p-3.5 shadow-sm border border-slate-200/70">
+          <label id="bonus-checkbox-wrapper" class="flex items-start gap-3 cursor-pointer">
+            <input id="use-bonus-checkbox" type="checkbox" onchange="toggleUseBonus()" class="mt-0.5 w-4 h-4 rounded accent-amber-500 cursor-pointer" />
+            <div class="flex-1">
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-bold text-slate-900">Usar Ticket Bônus (+30 min)</span>
+                <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">Grátis</span>
+              </div>
+              <p id="bonus-helper-text" class="text-[11px] text-slate-500 mt-0.5 leading-snug">
+                Adiciona +30 minutos ao tempo do seu ticket principal.
+              </p>
+            </div>
+          </label>
+        </div>
+
+        <!-- Simulador de Falha (Para testar o ciclo TENTATIVA < 3 e estorno de bônus do fluxograma) -->
+        <div class="bg-slate-200/70 rounded-xl px-3 py-2 flex items-center justify-between">
+          <span class="text-[11px] text-slate-600">Simular falha na validação do pagamento</span>
+          <input id="simulate-payment-fail" type="checkbox" class="w-4 h-4 accent-red-600 cursor-pointer" />
+        </div>
+      </div>
+
+      <!-- Rodapé Fixo: Botão Finalizar Compra -->
+      <div class="bg-white px-4 py-3 border-t border-slate-200 shrink-0 space-y-1.5">
+        <button type="button" onclick="finalizePurchase()" class="w-full py-3.5 bg-[#3483FA] hover:bg-blue-600 active:scale-[0.99] text-white font-bold text-sm rounded-xl shadow-md shadow-blue-500/20 transition">
+          Finalizar Compra
+        </button>
+        <button type="button" onclick="cancelPurchaseFlow()" class="w-full py-1.5 text-[11px] font-semibold text-slate-500 hover:text-red-600 transition">
+          Cancelar compra
+        </button>
+      </div>
+    </section>
+
+    <!-- ========================================================= -->
+    <!-- TELA 6: CADASTRO DE CARTÃO                                -->
+    <!-- ========================================================= -->
+    <section id="screen-register-card" class="hidden flex-1 flex flex-col bg-slate-50 overflow-hidden">
+      <div class="bg-white px-5 py-3.5 border-b border-slate-200 flex items-center gap-3 shrink-0">
+        <button type="button" onclick="navigateTo('screen-payment')" class="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-700">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>
+        </button>
+        <div>
+          <h2 class="text-base font-bold text-slate-900">Novo Cartão</h2>
+          <p class="text-[11px] text-slate-500">Adicione um cartão de crédito ou débito</p>
+        </div>
+      </div>
+
+      <form id="register-card-form" onsubmit="handleRegisterCard(event)" class="flex-1 phone-scroll overflow-y-auto px-5 py-4 space-y-3.5">
+        <!-- Cartão Visual Interativo -->
+        <div class="bg-gradient-to-br from-slate-800 via-blue-900 to-indigo-950 text-white rounded-2xl p-4 shadow-lg relative overflow-hidden">
+          <div class="flex items-center justify-between mb-5">
+            <div class="w-9 h-6 rounded bg-amber-300/90"></div>
+            <span id="card-preview-brand" class="text-xs font-extrabold tracking-widest uppercase text-blue-200">VISA / MASTER</span>
+          </div>
+          <p id="card-preview-number" class="font-mono text-base tracking-widest mb-4">•••• •••• •••• ••••</p>
+          <div class="flex items-center justify-between text-[11px]">
+            <div>
+              <p class="text-[9px] text-slate-400 uppercase">Titular</p>
+              <p id="card-preview-holder" class="font-semibold uppercase truncate max-w-[180px]">NOME NO CARTÃO</p>
+            </div>
+            <div>
+              <p class="text-[9px] text-slate-400 uppercase">Validade</p>
+              <p id="card-preview-expiry" class="font-mono font-semibold">MM/AA</p>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Número do Cartão *</label>
+          <input id="card-number" type="text" required maxlength="19" oninput="maskCardNumber(this)" placeholder="0000 0000 0000 0000"
+            class="w-full px-3.5 py-2.5 text-sm font-mono bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-600" />
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Nome Impresso no Cartão *</label>
+          <input id="card-holder" type="text" required oninput="updateCardPreview()" placeholder="Como aparece no cartão"
+            class="w-full px-3.5 py-2.5 text-sm uppercase bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-600" />
+        </div>
+
+        <div class="grid grid-cols-2 gap-2.5">
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Validade *</label>
+            <input id="card-expiry" type="text" required maxlength="5" oninput="maskCardExpiry(this)" placeholder="MM/AA"
+              class="w-full px-3 py-2.5 text-sm font-mono bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-600" />
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">CVV *</label>
+            <input id="card-cvv" type="password" required maxlength="4" placeholder="123"
+              class="w-full px-3 py-2.5 text-sm font-mono bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-600" />
+          </div>
+        </div>
+
+        <div id="reg-card-error" class="hidden text-xs text-red-600 bg-red-50 border border-red-200 rounded-xl px-3 py-2 font-medium"></div>
+
+        <div class="pt-2 flex gap-2.5">
+          <button type="button" onclick="navigateTo('screen-payment')" class="flex-1 py-3 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold text-xs rounded-xl transition">
+            Cancelar
+          </button>
+          <button type="submit" class="flex-[2] py-3 bg-[#3483FA] hover:bg-blue-600 text-white font-bold text-xs rounded-xl shadow-md transition">
+            Salvar Cartão
+          </button>
+        </div>
+      </form>
+    </section>
+
+    <!-- ========================================================= -->
+    <!-- TELA 7: PAGAMENTO POR PIX (QR CODE + COPIA E COLA)        -->
+    <!-- ========================================================= -->
+    <section id="screen-pix" class="hidden flex-1 flex flex-col bg-slate-50 overflow-hidden">
+      <div class="bg-emerald-600 text-white px-5 py-3.5 flex items-center justify-between shrink-0">
+        <div class="flex items-center gap-3">
+          <button type="button" onclick="handlePaymentFailure('Pagamento PIX cancelado pelo usuário.')" class="w-8 h-8 rounded-full bg-white/15 hover:bg-white/25 flex items-center justify-center">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>
+          </button>
+          <div>
+            <h2 class="text-base font-bold">Pagamento via Pix</h2>
+            <p class="text-[11px] text-emerald-100">Escaneie o QR Code ou copie o código</p>
+          </div>
+        </div>
+        <span id="pix-exp-timer" class="font-mono text-xs font-bold bg-emerald-800/60 px-2.5 py-1 rounded-lg">04:59</span>
+      </div>
+
+      <div class="flex-1 phone-scroll overflow-y-auto px-5 py-4 flex flex-col items-center justify-between text-center">
+        <div class="w-full bg-white rounded-2xl p-4 border border-slate-200 shadow-sm">
+          <p class="text-xs text-slate-500">Valor a pagar</p>
+          <p id="pix-amount" class="text-2xl font-extrabold text-slate-900 mt-0.5">R$ 3,50</p>
+          <p id="pix-summary-text" class="text-[11px] text-slate-500 mt-1">1 Ticket • Rua 1</p>
+
+          <!-- QR Code SVG Estilizado -->
+          <div class="my-4 p-3 bg-white border-2 border-emerald-500/30 rounded-2xl inline-block shadow-inner">
+            <svg class="w-40 h-40 text-slate-900" viewBox="0 0 100 100" fill="currentColor">
+              <!-- Cantos padrão QR -->
+              <path d="M10 10h25v25H10V10zm5 5v15h15V15H15zm5 5h5v5h-5v-5z"/>
+              <path d="M65 10h25v25H65V10zm5 5v15h15V15H70zm5 5h5v5h-5v-5z"/>
+              <path d="M10 65h25v25H10V65zm5 5v15h15V70H15zm5 5h5v5h-5v-5z"/>
+              <!-- Módulos de dados -->
+              <rect x="42" y="12" width="6" height="6"/><rect x="52" y="12" width="6" height="6"/>
+              <rect x="42" y="22" width="12" height="6"/><rect x="48" y="32" width="8" height="6"/>
+              <rect x="12" y="42" width="10" height="6"/><rect x="28" y="42" width="6" height="12"/>
+              <rect x="40" y="42" width="18" height="18" rx="3" fill="#059669"/>
+              <rect x="64" y="42" width="8" height="6"/><rect x="78" y="42" width="12" height="6"/>
+              <rect x="64" y="54" width="14" height="6"/><rect x="84" y="54" width="6" height="12"/>
+              <rect x="42" y="66" width="6" height="10"/><rect x="54" y="66" width="12" height="6"/>
+              <rect x="42" y="82" width="14" height="8"/><rect x="62" y="78" width="10" height="12"/>
+              <rect x="78" y="72" width="12" height="6"/><rect x="78" y="84" width="12" height="6"/>
+            </svg>
+          </div>
+
+          <!-- Código Copia e Cola -->
+          <div class="text-left">
+            <label class="block text-[10px] font-bold uppercase text-slate-400 mb-1">Pix Copia e Cola</label>
+            <div class="flex items-center gap-1.5">
+              <input id="pix-copy-code" type="text" readonly value="00020126580014BR.GOV.BCB.PIX0136rotapark-estacionamento-rotativo5204000053039865802BR"
+                class="flex-1 text-[11px] font-mono bg-slate-100 border border-slate-200 rounded-xl px-3 py-2 text-slate-600 focus:outline-none" />
+              <button type="button" onclick="copyPixCode()" class="px-3 py-2 bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold rounded-xl shrink-0 transition">
+                Copiar
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="w-full space-y-2 mt-4">
+          <button type="button" onclick="confirmPixPayment()" class="w-full py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm rounded-xl shadow-lg shadow-emerald-600/20 transition">
+            ✓ Confirmar Pagamento Pix
+          </button>
+          <button type="button" onclick="handlePaymentFailure('Pagamento PIX não validado.')" class="w-full py-2 text-xs font-semibold text-slate-500 hover:text-red-600 transition">
+            Simular falha / Tentar outro meio
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========================================================= -->
+    <!-- MODAIS (REGRAS "i", ESQUECI SENHA, TICKET ATIVO)          -->
+    <!-- ========================================================= -->
+
+    <!-- Modal Regras do Estacionamento (Ícone "i") -->
+    <div id="modal-rules" class="hidden absolute inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-4">
+      <div class="bg-white w-full rounded-3xl p-5 shadow-2xl space-y-3.5 animate-push">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <span class="w-7 h-7 rounded-full bg-amber-400 text-slate-900 font-serif font-extrabold flex items-center justify-center text-sm">i</span>
+            <h3 class="text-base font-extrabold text-slate-900">Regras do Estacionamento</h3>
+          </div>
+          <button onclick="closeModal('modal-rules')" class="w-7 h-7 rounded-full bg-slate-100 text-slate-600 font-bold text-xs">✕</button>
+        </div>
+
+        <div class="space-y-2.5 text-xs text-slate-600 leading-relaxed">
+          <div class="bg-blue-50 border border-blue-100 rounded-2xl p-3">
+            <p class="font-bold text-blue-900 mb-1">📍 Tempo por Setor (Distância do Centro)</p>
+            <ul class="space-y-1 text-blue-800">
+              <li>• <strong>Rua 1 (100m do centro):</strong> 2 horas por ticket</li>
+              <li>• <strong>Rua 2 (250m do centro):</strong> 3 horas por ticket</li>
+              <li>• <strong>Rua 3 (450m do centro):</strong> 4 horas por ticket</li>
+              <li>• <strong>Rua 4 (700m do centro):</strong> 5 horas por ticket</li>
+              <li>• <strong>Rua 5 (1,0 km do centro):</strong> 6 horas por ticket</li>
+            </ul>
+          </div>
+
+          <div class="bg-amber-50 border border-amber-100 rounded-2xl p-3">
+            <p class="font-bold text-amber-900 mb-1">🎁 Programa de Fidelidade (+30 min)</p>
+            <p class="text-amber-800">A cada <strong>5 compras</strong> de tickets validadas, você ganha <strong>1 Ticket Bônus de +30 minutos</strong> no seu inventário para usar quando quiser.</p>
+          </div>
+
+          <div class="bg-slate-50 border border-slate-200 rounded-2xl p-3">
+            <p class="font-bold text-slate-800 mb-1">🔄 Cancelamento e Estorno</p>
+            <p>Você possui até <strong>3 tentativas</strong> para validar o pagamento. Caso a compra seja cancelada, qualquer bônus de 30 min selecionado é estornado automaticamente ao seu inventário.</p>
+          </div>
+        </div>
+
+        <button onclick="closeModal('modal-rules')" class="w-full py-3 bg-slate-900 text-white font-bold text-xs rounded-xl">
+          Entendi
+        </button>
+      </div>
+    </div>
+
+    <!-- Modal Esqueci Senha -->
+    <div id="modal-forgot-password" class="hidden absolute inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+      <div class="bg-white w-full rounded-3xl p-5 shadow-2xl space-y-3">
+        <div class="flex items-center justify-between">
+          <h3 class="text-base font-extrabold text-slate-900">Recuperar Senha</h3>
+          <button onclick="closeModal('modal-forgot-password')" class="w-7 h-7 rounded-full bg-slate-100 text-slate-600 font-bold text-xs">✕</button>
+        </div>
+        <p class="text-xs text-slate-500">Digite seu e-mail cadastrado para enviarmos um link de redefinição de senha.</p>
+        <input id="forgot-email" type="email" placeholder="seuemail@exemplo.com" class="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-600" />
+        <button onclick="sendPasswordRecovery()" class="w-full py-3 bg-blue-600 text-white font-bold text-xs rounded-xl">
+          Enviar Link de Recuperação
+        </button>
+      </div>
+    </div>
+
+    <!-- Modal Comprovante / Cronômetro do Ticket Gerado -->
+    <div id="modal-active-ticket" class="hidden absolute inset-0 z-50 bg-slate-900/75 backdrop-blur-xs flex items-center justify-center p-4">
+      <div class="bg-white w-full rounded-3xl overflow-hidden shadow-2xl animate-push">
+        <div class="bg-gradient-to-r from-emerald-600 to-teal-600 text-white p-5 text-center">
+          <div class="w-12 h-12 rounded-full bg-white/20 mx-auto flex items-center justify-center mb-2">
+            <svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+          </div>
+          <h3 class="text-lg font-extrabold">Ticket Gerado com Sucesso!</h3>
+          <p class="text-xs text-emerald-100 mt-1">Comprovante enviado no app e por e-mail.</p>
+        </div>
+
+        <div class="p-5 space-y-4">
+          <!-- Cronômetro Regressivo em Destaque -->
+          <div class="bg-slate-900 text-white rounded-2xl p-4 text-center relative overflow-hidden">
+            <p class="text-[10px] uppercase tracking-widest text-slate-400 font-bold mb-1">Tempo Restante de Estacionamento</p>
+            <div id="modal-countdown" class="font-mono text-3xl font-extrabold text-amber-400 tracking-wider">
+              02:00:00
+            </div>
+            <p id="modal-bonus-applied-tag" class="hidden text-[11px] text-emerald-400 font-semibold mt-1">
+              ✨ Inclui +30 min de Ticket Bônus!
+            </p>
+          </div>
+
+          <!-- Banner de Novo Bônus Ganho (se atingiu 5 compras) -->
+          <div id="modal-new-bonus-earned" class="hidden bg-amber-50 border border-amber-300 rounded-2xl p-3 text-center">
+            <p class="text-xs font-extrabold text-amber-900">🎉 Parabéns! Você completou 5 compras!</p>
+            <p class="text-[11px] text-amber-800 mt-0.5">Você ganhou <strong>+1 Ticket Bônus de 30 min</strong> no seu inventário.</p>
+          </div>
+
+          <!-- Detalhes do Comprovante -->
+          <div class="bg-slate-50 rounded-2xl p-3.5 border border-slate-200/80 space-y-2 text-xs">
+            <div class="flex justify-between">
+              <span class="text-slate-500">Setor / Rua:</span>
+              <span id="ticket-detail-street" class="font-bold text-slate-900">Rua 1</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-slate-500">Veículo / Placa:</span>
+              <span id="ticket-detail-plate" class="font-mono font-bold text-slate-900">ABC1D23</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-slate-500">Quantidade:</span>
+              <span id="ticket-detail-qty" class="font-semibold text-slate-800">1 ticket</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-slate-500">Pagamento:</span>
+              <span id="ticket-detail-method" class="font-semibold text-emerald-700">Pix • R$ 3,50</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-slate-500">E-mail de envio:</span>
+              <span id="ticket-detail-email" class="font-medium text-slate-700 truncate max-w-[160px]">usuario@email.com</span>
+            </div>
+          </div>
+
+          <button onclick="closeModal('modal-active-ticket'); navigateTo('screen-home');" class="w-full py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm rounded-xl shadow-md transition">
+            Voltar ao Início
+          </button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    // =========================================================
+    // ESTADO GLOBAL DA APLICAÇÃO (Alinhado ao Fluxograma)
+    // =========================================================
+    const TICKET_UNIT_PRICE = 3.50;
+
+    const STREETS = [
+      { id: 1, name: 'Rua 1 — Centro', distance: '100m do centro', hours: 2 },
+      { id: 2, name: 'Rua 2 — Av. Comercial', distance: '250m do centro', hours: 3 },
+      { id: 3, name: 'Rua 3 — Praça Matriz', distance: '450m do centro', hours: 4 },
+      { id: 4, name: 'Rua 4 — Bairro Jardim', distance: '700m do centro', hours: 5 },
+      { id: 5, name: 'Rua 5 — Setor Norte', distance: '1,0 km do centro', hours: 6 },
+    ];
+
+    const appState = {
+      users: [], // { name, cpf, email, password, phone, cep }
+      currentUser: null,
+      vehicle: null, // { model, color, plate, ownerName, ownerPhone, ownerCpf, ownerEmail, ownerCep }
+      cards: [
+        { id: 'card-default', brand: 'Mastercard', last4: '4821', holder: 'ALESSANDRO SILVA', expiry: '08/29' }
+      ],
+      selectedStreetId: 1,
+      ticketQty: 1,
+      selectedPaymentMethod: 'pix', // 'pix' ou id do cartão
+      bonusInventory: 1, // Começa com 1 bônus de +30min para facilitar o teste imediato
+      loyaltyPurchaseCount: 4, // 4/5 compras para demonstrar facilmente o ganho na próxima compra!
+      useBonusSelected: false,
+      paymentAttempts: 0, // Contador TENTATIVA (0 a 3)
+      activeTicket: null, // { street, plate, qty, totalPrice, method, email, remainingSeconds, usedBonus }
+      timerInterval: null,
+      pixTimerInterval: null
+    };
+
+    // =========================================================
+    // INICIALIZAÇÃO E RELÓGIO
+    // =========================================================
+    window.onload = function () {
+      updateSystemClock();
+      setInterval(updateSystemClock, 15000);
+      renderStreetCards();
+      selectStreet(1);
+    };
+
+    function updateSystemClock() {
+      const now = new Date();
+      const hh = String(now.getHours()).padStart(2, '0');
+      const mm = String(now.getMinutes()).padStart(2, '0');
+      document.getElementById('clock-time').textContent = `${hh}:${mm}`;
+    }
+
+    // =========================================================
+    // NAVEGAÇÃO ENTRE TELAS
+    // =========================================================
+    function navigateTo(screenId) {
+      const screens = [
+        'screen-login',
+        'screen-register-user',
+        'screen-register-vehicle',
+        'screen-home',
+        'screen-payment',
+        'screen-register-card',
+        'screen-pix'
+      ];
+      screens.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.classList.add('hidden');
+      });
+
+      const target = document.getElementById(screenId);
+      if (target) target.classList.remove('hidden');
+
+      if (screenId === 'screen-home') updateHomeUI();
+      if (screenId === 'screen-payment') updateCheckoutUI();
+    }
+
+    function showToast(message, icon = 'ℹ️') {
+      const toast = document.getElementById('toast');
+      document.getElementById('toast-icon').textContent = icon;
+      document.getElementById('toast-text').textContent = message;
+      toast.classList.remove('hidden');
+      clearTimeout(toast._timeout);
+      toast._timeout = setTimeout(() => {
+        toast.classList.add('hidden');
+      }, 3200);
+    }
+
+    function openModal(modalId) {
+      document.getElementById(modalId).classList.remove('hidden');
+    }
+
+    function closeModal(modalId) {
+      document.getElementById(modalId).classList.add('hidden');
+    }
+
+    // =========================================================
+    // FLUXO 1 & 2: LOGIN E CADASTRO DE USUÁRIO
+    // =========================================================
+    function togglePasswordVisibility(inputId) {
+      const input = document.getElementById(inputId);
+      input.type = input.type === 'password' ? 'text' : 'password';
+    }
+
+    function handleRegisterUser(e) {
+      e.preventDefault();
+      const name = document.getElementById('reg-name').value.trim();
+      const cpf = document.getElementById('reg-cpf').value.trim();
+      const email = document.getElementById('reg-email').value.trim().toLowerCase();
+      const password = document.getElementById('reg-pass').value;
+      const passConfirm = document.getElementById('reg-pass-confirm').value;
+      const phone = document.getElementById('reg-phone').value.trim();
+      const cep = document.getElementById('reg-cep').value.trim();
+      const errBox = document.getElementById('reg-user-error');
+
+      if (password !== passConfirm) {
+        errBox.textContent = 'As senhas não coincidem. Verifique e tente novamente.';
+        errBox.classList.remove('hidden');
+        return;
+      }
+
+      if (cpf.length < 14) {
+        errBox.textContent = 'Por favor, preencha o CPF completo.';
+        errBox.classList.remove('hidden');
+        return;
+      }
+
+      errBox.classList.add('hidden');
+
+      // Registra dados no banco (memória) e retorna para verificação de login (conforme fluxograma)
+      const existingIdx = appState.users.findIndex(u => u.email === email);
+      const userObj = { name, cpf, email, password, phone, cep };
+      if (existingIdx >= 0) {
+        appState.users[existingIdx] = userObj;
+      } else {
+        appState.users.push(userObj);
+      }
+
+      document.getElementById('login-email').value = email;
+      document.getElementById('login-password').value = '';
+      document.getElementById('login-error').classList.add('hidden');
+
+      navigateTo('screen-login');
+      showToast('Conta registrada! Faça login para continuar.', '✅');
+    }
+
+    function handleLogin(e) {
+      e.preventDefault();
+      const email = document.getElementById('login-email').value.trim().toLowerCase();
+      const password = document.getElementById('login-password').value;
+      const errBox = document.getElementById('login-error');
+
+      const foundUser = appState.users.find(u => u.email === email && u.password === password);
+
+      if (!foundUser) {
+        errBox.textContent = 'Credenciais inválidas ou conta não cadastrada. Clique em "Cadastrar" abaixo ou use "Demo Rápida".';
+        errBox.classList.remove('hidden');
+        return;
+      }
+
+      errBox.classList.add('hidden');
+      appState.currentUser = foundUser;
+
+      // Fluxograma: após validar credenciais -> verificar se tem veículo cadastrado
+      if (!appState.vehicle) {
+        autofillOwnerData();
+        navigateTo('screen-register-vehicle');
+        showToast('Bem-vindo! Cadastre seu veículo.', '🚗');
+      } else {
+        navigateTo('screen-home');
+      }
+    }
+
+    function socialLogin(provider) {
+      const demoUser = {
+        name: `Usuário ${provider}`,
+        cpf: '123.456.789-00',
+        email: `usuario.${provider.toLowerCase()}@email.com`,
+        password: '123',
+        phone: '(37) 99999-0000',
+        cep: '35600-000'
+      };
+      appState.currentUser = demoUser;
+      showToast(`Autenticado via ${provider}!`, '✅');
+
+      if (!appState.vehicle) {
+        autofillOwnerData();
+        navigateTo('screen-register-vehicle');
+      } else {
+        navigateTo('screen-home');
+      }
+    }
+
+    function sendPasswordRecovery() {
+      const email = document.getElementById('forgot-email').value.trim();
+      if (!email) {
+        showToast('Informe um e-mail válido.', '⚠️');
+        return;
+      }
+      closeModal('modal-forgot-password');
+      showToast(`Link de recuperação enviado para ${email}`, '📩');
+    }
+
+    function logoutUser() {
+      appState.currentUser = null;
+      navigateTo('screen-login');
+      showToast('Sessão encerrada.', '👋');
+    }
+
+    // =========================================================
+    // FLUXO 3: CADASTRO DE VEÍCULO
+    // =========================================================
+    function updatePlatePreview(input) {
+      const val = input.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+      input.value = val;
+      document.getElementById('plate-preview').textContent = val || 'ABC1D23';
+    }
+
+    function autofillOwnerData() {
+      if (!appState.currentUser) return;
+      document.getElementById('owner-name').value = appState.currentUser.name || '';
+      document.getElementById('owner-cpf').value = appState.currentUser.cpf || '';
+      document.getElementById('owner-phone').value = appState.currentUser.phone || '';
+      document.getElementById('owner-email').value = appState.currentUser.email || '';
+      document.getElementById('owner-cep').value = appState.currentUser.cep || '';
+    }
+
+    function handleRegisterVehicle(e) {
+      e.preventDefault();
+      const plate = document.getElementById('veh-plate').value.trim().toUpperCase();
+      const color = document.getElementById('veh-color').value.trim();
+      const model = document.getElementById('veh-model').value.trim();
+      const ownerName = document.getElementById('owner-name').value.trim();
+      const ownerCpf = document.getElementById('owner-cpf').value.trim();
+      const ownerPhone = document.getElementById('owner-phone').value.trim();
+      const ownerEmail = document.getElementById('owner-email').value.trim();
+      const ownerCep = document.getElementById('owner-cep').value.trim();
+      const errBox = document.getElementById('reg-veh-error');
+
+      // Validação de placa (7 caracteres padrão Mercosul ou antigo)
+      if (plate.length < 7) {
+        errBox.textContent = 'Placa inválida. Informe os 7 caracteres da placa (ex: ABC1D23).';
+        errBox.classList.remove('hidden');
+        return;
+      }
+
+      errBox.classList.add('hidden');
+      appState.vehicle = { plate, color, model, ownerName, ownerCpf, ownerPhone, ownerEmail, ownerCep };
+
+      navigateTo('screen-home');
+      showToast(`Veículo ${plate} validado e salvo!`, '✅');
+    }
+
+    function cancelVehicleScreen() {
+      if (appState.vehicle) {
+        navigateTo('screen-home');
+      } else {
+        navigateTo('screen-login');
+      }
+    }
+
+    // =========================================================
+    // FLUXO 4: TELA INICIAL (MAPA E SELEÇÃO DAS 5 RUAS)
+    // =========================================================
+    function renderStreetCards() {
+      const container = document.getElementById('street-cards-container');
+      container.innerHTML = STREETS.map(street => {
+        const isSelected = street.id === appState.selectedStreetId;
+        return `
+          <div id="street-card-${street.id}" onclick="selectStreet(${street.id})"
+            class="cursor-pointer rounded-2xl p-3 border-2 transition flex items-center justify-between ${
+              isSelected
+                ? 'bg-blue-50/90 border-blue-600 shadow-sm'
+                : 'bg-white border-slate-200/80 hover:border-blue-300'
+            }">
+            <div class="flex items-center gap-3">
+              <div class="w-9 h-9 rounded-xl flex items-center justify-center font-extrabold text-xs ${
+                isSelected ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-700'
+              }">
+                R${street.id}
+              </div>
+              <div>
+                <p class="text-xs font-bold text-slate-900">${street.name}</p>
+                <p class="text-[11px] text-slate-500 flex items-center gap-1 mt-0.5">
+                  <span>📍 ${street.distance}</span>
+                </p>
+              </div>
+            </div>
+            <div class="text-right">
+              <span class="inline-block text-xs font-extrabold px-2.5 py-1 rounded-lg ${
+                isSelected ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-800'
+              }">
+                ${street.hours}h / ticket
+              </span>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function selectStreet(streetId) {
+      appState.selectedStreetId = streetId;
+      renderStreetCards();
+
+      // Atualiza destaque no SVG Mini Mapa
+      STREETS.forEach(s => {
+        const group = document.getElementById(`map-street-${s.id}`);
+        if (!group) return;
+        const rects = group.querySelectorAll('rect');
+        if (s.id === streetId) {
+          rects[0].setAttribute('fill', '#2563EB');
+          rects[1].setAttribute('fill', '#1E40AF');
+        } else {
+          rects[0].setAttribute('fill', '#64748B');
+          rects[1].setAttribute('fill', '#334155');
+        }
+      });
+    }
+
+    function updateHomeUI() {
+      if (appState.currentUser) {
+        const firstName = appState.currentUser.name.split(' ')[0];
+        document.getElementById('home-user-name').textContent = firstName;
+        document.getElementById('home-user-initial').textContent = firstName.charAt(0).toUpperCase();
+      }
+      if (appState.vehicle) {
+        document.getElementById('home-vehicle-plate').textContent = appState.vehicle.plate;
+        document.getElementById('home-vehicle-model').textContent = `• ${appState.vehicle.model}`;
+      }
+
+      // Atualiza Bônus e Fidelidade (0/5)
+      document.getElementById('home-bonus-count').textContent = appState.bonusInventory;
+      document.getElementById('home-loyalty-progress').textContent = `${appState.loyaltyPurchaseCount}/5`;
+
+      const dotsContainer = document.getElementById('home-loyalty-dots');
+      dotsContainer.innerHTML = [1, 2, 3, 4, 5].map(idx => {
+        const active = idx <= appState.loyaltyPurchaseCount;
+        return `<span class="w-2.5 h-2.5 rounded-full ${active ? 'bg-amber-400 shadow-xs' : 'bg-white/20'}"></span>`;
+      }).join('');
+    }
+
+    function goToCheckout() {
+      appState.ticketQty = 1;
+      appState.useBonusSelected = false;
+      appState.paymentAttempts = 0; // Inicializa TENTATIVA = 0 conforme fluxograma
+      document.getElementById('simulate-payment-fail').checked = false;
+      navigateTo('screen-payment');
+    }
+
+    // =========================================================
+    // FLUXO 5: CHECKOUT (ESTILO MERCADO LIVRE) E CARTÕES
+    // =========================================================
+    function updateCheckoutUI() {
+      const street = STREETS.find(s => s.id === appState.selectedStreetId) || STREETS[0];
+
+      document.getElementById('pay-street-badge').textContent = `Rua ${street.id} • ${street.hours}h por ticket`;
+      document.getElementById('pay-street-title').textContent = street.name;
+      document.getElementById('pay-vehicle-plate').textContent = appState.vehicle ? appState.vehicle.plate : '---';
+      document.getElementById('pay-inventory-count').textContent = appState.bonusInventory;
+
+      // Quantidade, Tempo Total e Valor
+      document.getElementById('pay-ticket-qty').textContent = appState.ticketQty;
+      const totalHours = street.hours * appState.ticketQty;
+      const extraMins = appState.useBonusSelected ? 30 : 0;
+      document.getElementById('pay-total-duration').textContent = `${totalHours}h ${extraMins > 0 ? '30min' : '00min'}`;
+
+      const totalPrice = (TICKET_UNIT_PRICE * appState.ticketQty).toFixed(2).replace('.', ',');
+      document.getElementById('pay-total-price').textContent = `R$ ${totalPrice}`;
+
+      // Badge de tentativas (se já houve falha)
+      const attemptBadge = document.getElementById('attempt-badge');
+      if (appState.paymentAttempts > 0) {
+        attemptBadge.textContent = `Tentativa ${appState.paymentAttempts + 1}/3`;
+        attemptBadge.classList.remove('hidden');
+      } else {
+        attemptBadge.classList.add('hidden');
+      }
+
+      // Checkbox de Bônus (+30 min)
+      const bonusCheckbox = document.getElementById('use-bonus-checkbox');
+      const bonusHelper = document.getElementById('bonus-helper-text');
+      if (appState.bonusInventory > 0) {
+        bonusCheckbox.disabled = false;
+        bonusCheckbox.checked = appState.useBonusSelected;
+        bonusHelper.textContent = `Você possui ${appState.bonusInventory} ticket(s) bônus. Ative para somar +30 min grátis!`;
+      } else {
+        bonusCheckbox.disabled = true;
+        bonusCheckbox.checked = false;
+        appState.useBonusSelected = false;
+        bonusHelper.textContent = `Saldo zerado. Complete 5 compras (${appState.loyaltyPurchaseCount}/5) para ganhar +1 bônus.`;
+      }
+
+      renderPaymentMethods();
+    }
+
+    function changeTicketQty(delta) {
+      const next = appState.ticketQty + delta;
+      if (next < 1 || next > 10) return;
+      appState.ticketQty = next;
+      updateCheckoutUI();
+    }
+
+    function toggleUseBonus() {
+      const checked = document.getElementById('use-bonus-checkbox').checked;
+      if (checked && appState.bonusInventory <= 0) {
+        document.getElementById('use-bonus-checkbox').checked = false;
+        return;
+      }
+      appState.useBonusSelected = checked;
+      updateCheckoutUI();
+    }
+
+    function renderPaymentMethods() {
+      const pixCard = document.getElementById('pm-option-pix');
+      const pixRadio = pixCard.querySelector('input[type="radio"]');
+      if (appState.selectedPaymentMethod === 'pix') {
+        pixCard.classList.add('border-[#3483FA]', 'bg-blue-50/30');
+        pixCard.classList.remove('border-slate-200');
+        pixRadio.checked = true;
+      } else {
+        pixCard.classList.remove('border-[#3483FA]', 'bg-blue-50/30');
+        pixCard.classList.add('border-slate-200');
+        pixRadio.checked = false;
+      }
+
+      const cardsContainer = document.getElementById('saved-cards-list');
+      cardsContainer.innerHTML = appState.cards.map(card => {
+        const selected = appState.selectedPaymentMethod === card.id;
+        return `
+          <label onclick="selectPaymentMethod('${card.id}')"
+            class="flex items-center justify-between p-3 rounded-xl border-2 cursor-pointer transition ${
+              selected ? 'border-[#3483FA] bg-blue-50/30' : 'border-slate-200 hover:border-slate-300'
+            }">
+            <div class="flex items-center gap-3">
+              <div class="w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center shrink-0">
+                <svg class="w-5 h-5 text-slate-700" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                  <rect x="2" y="5" width="20" height="14" rx="2"/>
+                  <line x1="2" y1="10" x2="22" y2="10"/>
+                </svg>
+              </div>
+              <div>
+                <p class="text-xs font-bold text-slate-900">${card.brand} •••• ${card.last4}</p>
+                <p class="text-[11px] text-slate-500">Crédito • Val. ${card.expiry}</p>
+              </div>
+            </div>
+            <input type="radio" name="payment_method" value="${card.id}" ${selected ? 'checked' : ''} class="w-4 h-4 accent-[#3483FA]" />
+          </label>
+        `;
+      }).join('');
+    }
+
+    function selectPaymentMethod(methodId) {
+      appState.selectedPaymentMethod = methodId;
+      renderPaymentMethods();
+    }
+
+    // Cadastro de Novo Cartão
+    function maskCardNumber(input) {
+      let v = input.value.replace(/\D/g, '').substring(0, 16);
+      v = v.replace(/(\d{4})(?=\d)/g, '$1 ');
+      input.value = v;
+      updateCardPreview();
+    }
+
+    function maskCardExpiry(input) {
+      let v = input.value.replace(/\D/g, '').substring(0, 4);
+      if (v.length >= 3) v = v.slice(0, 2) + '/' + v.slice(2);
+      input.value = v;
+      updateCardPreview();
+    }
+
+    function updateCardPreview() {
+      const num = document.getElementById('card-number').value || '•••• •••• •••• ••••';
+      const holder = document.getElementById('card-holder').value.toUpperCase() || 'NOME NO CARTÃO';
+      const expiry = document.getElementById('card-expiry').value || 'MM/AA';
+
+      document.getElementById('card-preview-number').textContent = num;
+      document.getElementById('card-preview-holder').textContent = holder;
+      document.getElementById('card-preview-expiry').textContent = expiry;
+
+      const firstDigit = num.charAt(0);
+      const brand = firstDigit === '4' ? 'VISA' : firstDigit === '5' ? 'MASTERCARD' : 'CARTÃO';
+      document.getElementById('card-preview-brand').textContent = brand;
+    }
+
+    function handleRegisterCard(e) {
+      e.preventDefault();
+      const rawNum = document.getElementById('card-number').value.replace(/\D/g, '');
+      const holder = document.getElementById('card-holder').value.trim().toUpperCase();
+      const expiry = document.getElementById('card-expiry').value.trim();
+      const cvv = document.getElementById('card-cvv').value.trim();
+      const errBox = document.getElementById('reg-card-error');
+
+      if (rawNum.length < 13 || expiry.length < 5 || cvv.length < 3) {
+        errBox.textContent = 'Dados do cartão inválidos. Verifique número, validade e CVV.';
+        errBox.classList.remove('hidden');
+        return;
+      }
+
+      errBox.classList.add('hidden');
+      const brand = rawNum.startsWith('4') ? 'Visa' : 'Mastercard';
+      const newCard = {
+        id: 'card-' + Date.now(),
+        brand,
+        last4: rawNum.slice(-4),
+        holder,
+        expiry
+      };
+
+      appState.cards.push(newCard);
+      appState.selectedPaymentMethod = newCard.id;
+
+      // Limpa formulário
+      document.getElementById('register-card-form').reset();
+      updateCardPreview();
+
+      navigateTo('screen-payment');
+      showToast(`Cartão ${brand} •••• ${newCard.last4} adicionado!`, '💳');
+    }
+
+    // =========================================================
+    // FLUXO 6: VALIDAÇÃO DE PAGAMENTO, PIX, TENTATIVAS E BÔNUS
+    // =========================================================
+    function finalizePurchase() {
+      // Se o usuário marcou usar bônus, reserva/subtrai do inventário (conforme fluxograma antes do pagamento)
+      if (appState.useBonusSelected && appState.bonusInventory > 0) {
+        appState.bonusInventory -= 1;
+      }
+
+      const simulateFail = document.getElementById('simulate-payment-fail').checked;
+
+      if (appState.selectedPaymentMethod === 'pix') {
+        // Abre tela do PIX
+        const street = STREETS.find(s => s.id === appState.selectedStreetId) || STREETS[0];
+        const total = (TICKET_UNIT_PRICE * appState.ticketQty).toFixed(2).replace('.', ',');
+        document.getElementById('pix-amount').textContent = `R$ ${total}`;
+        document.getElementById('pix-summary-text').textContent = `${appState.ticketQty} Ticket(s) • ${street.name}`;
+        startPixExpirationTimer();
+        navigateTo('screen-pix');
+      } else {
+        // Pagamento via Cartão
+        if (simulateFail) {
+          handlePaymentFailure('Pagamento recusado pela operadora do cartão.');
+        } else {
+          completeValidatedPayment();
+        }
+      }
+    }
+
+    function confirmPixPayment() {
+      clearInterval(appState.pixTimerInterval);
+      const simulateFail = document.getElementById('simulate-payment-fail').checked;
+      if (simulateFail) {
+        handlePaymentFailure('Falha na confirmação do Pix.');
+      } else {
+        completeValidatedPayment();
+      }
+    }
+
+    // Implementa rigorosamente o ciclo do fluxograma:
+    // TENTATIVA + 1 -> TENTATIVA < 3? -> SIM (volta pagamento) / NÃO (estorna bônus se usou e cancela)
+    function handlePaymentFailure(reason) {
+      clearInterval(appState.pixTimerInterval);
+
+      // Devolve temporariamente o bônus reservado durante a tentativa para não descontar duplicado
+      if (appState.useBonusSelected) {
+        appState.bonusInventory += 1;
+      }
+
+      appState.paymentAttempts += 1;
+
+      if (appState.paymentAttempts < 3) {
+        navigateTo('screen-payment');
+        showToast(`${reason} (Tentativa ${appState.paymentAttempts}/3)`, '⚠️');
+      } else {
+        // Excedeu 3 tentativas -> Cancela compra e garante estorno do bônus
+        const estornoMsg = appState.useBonusSelected
+          ? 'Compra cancelada após 3 tentativas. Bônus de 30min estornado ao inventário!'
+          : 'Compra cancelada após 3 tentativas sem validação.';
+        appState.useBonusSelected = false;
+        appState.paymentAttempts = 0;
+        navigateTo('screen-home');
+        showToast(estornoMsg, '❌');
+      }
+    }
+
+    function cancelPurchaseFlow() {
+      const msg = appState.useBonusSelected
+        ? 'Compra cancelada. Seu bônus de 30min foi mantido no inventário.'
+        : 'Compra cancelada.';
+      appState.useBonusSelected = false;
+      appState.paymentAttempts = 0;
+      navigateTo('screen-home');
+      showToast(msg, 'ℹ️');
+    }
+
+    // Pagamento Validado com Sucesso!
+    function completeValidatedPayment() {
+      const street = STREETS.find(s => s.id === appState.selectedStreetId) || STREETS[0];
+      const totalSeconds = (street.hours * appState.ticketQty * 3600) + (appState.useBonusSelected ? 1800 : 0);
+      const totalPrice = (TICKET_UNIT_PRICE * appState.ticketQty).toFixed(2).replace('.', ',');
+
+      let methodLabel = 'Pix';
+      if (appState.selectedPaymentMethod !== 'pix') {
+        const card = appState.cards.find(c => c.id === appState.selectedPaymentMethod);
+        methodLabel = card ? `${card.brand} •••• ${card.last4}` : 'Cartão';
+      }
+
+      // Fluxograma: CONTAGEM PRO TICKET + 1 -> CONTAGEM DO TICKET == 5?
+      appState.loyaltyPurchaseCount += 1;
+      let earnedNewBonus = false;
+      if (appState.loyaltyPurchaseCount >= 5) {
+        appState.bonusInventory += 1;
+        appState.loyaltyPurchaseCount = 0; // Resetando contagem do ticket para 0
+        earnedNewBonus = true;
+      }
+
+      // Cria o Ticket Ativo e inicia o Cronômetro
+      appState.activeTicket = {
+        streetName: street.name,
+        plate: appState.vehicle ? appState.vehicle.plate : 'ABC1D23',
+        qty: appState.ticketQty,
+        totalPrice: `R$ ${totalPrice}`,
+        method: methodLabel,
+        email: appState.currentUser ? appState.currentUser.email : 'usuario@email.com',
+        remainingSeconds: totalSeconds,
+        usedBonus: appState.useBonusSelected
+      };
+
+      // Atualiza Modal de Comprovante
+      document.getElementById('ticket-detail-street').textContent = appState.activeTicket.streetName;
+      document.getElementById('ticket-detail-plate').textContent = appState.activeTicket.plate;
+      document.getElementById('ticket-detail-qty').textContent = `${appState.activeTicket.qty} ticket(s)`;
+      document.getElementById('ticket-detail-method').textContent = `${appState.activeTicket.method} • ${appState.activeTicket.totalPrice}`;
+      document.getElementById('ticket-detail-email').textContent = appState.activeTicket.email;
+
+      const bonusTag = document.getElementById('modal-bonus-applied-tag');
+      if (appState.activeTicket.usedBonus) bonusTag.classList.remove('hidden');
+      else bonusTag.classList.add('hidden');
+
+      const newBonusBanner = document.getElementById('modal-new-bonus-earned');
+      if (earnedNewBonus) newBonusBanner.classList.remove('hidden');
+      else newBonusBanner.classList.add('hidden');
+
+      // Banner persistente na Home
+      document.getElementById('banner-street-name').textContent = street.name;
+      document.getElementById('active-ticket-banner').classList.remove('hidden');
+
+      // Inicia cronômetro regressivo
+      startActiveTicketTimer();
+
+      // Mostra Notificação Push no topo + Modal de Sucesso
+      triggerPushNotification('Ticket gerado com sucesso! Comprovante enviado no app e por e-mail.');
+      navigateTo('screen-home');
+      openModal('modal-active-ticket');
+    }
+
+    function startActiveTicketTimer() {
+      clearInterval(appState.timerInterval);
+      updateTimerDisplays();
+      appState.timerInterval = setInterval(() => {
+        if (!appState.activeTicket) return;
+        if (appState.activeTicket.remainingSeconds > 0) {
+          appState.activeTicket.remainingSeconds -= 1;
+          updateTimerDisplays();
+        } else {
+          clearInterval(appState.timerInterval);
+          showToast('Tempo do ticket encerrado!', '⏰');
+        }
+      }, 1000);
+    }
+
+    function updateTimerDisplays() {
+      if (!appState.activeTicket) return;
+      const secs = appState.activeTicket.remainingSeconds;
+      const h = String(Math.floor(secs / 3600)).padStart(2, '0');
+      const m = String(Math.floor((secs % 3600) / 60)).padStart(2, '0');
+      const s = String(secs % 60).padStart(2, '0');
+      const formatted = `${h}:${m}:${s}`;
+
+      document.getElementById('modal-countdown').textContent = formatted;
+      document.getElementById('banner-timer').textContent = formatted;
+      document.getElementById('push-timer').textContent = formatted;
+    }
+
+    function triggerPushNotification(msg) {
+      document.getElementById('push-message').textContent = msg;
+      const push = document.getElementById('push-notification');
+      push.classList.remove('hidden');
+      clearTimeout(push._hideTimeout);
+      push._hideTimeout = setTimeout(() => {
+        push.classList.add('hidden');
+      }, 7000);
+    }
+
+    function hidePushNotification() {
+      document.getElementById('push-notification').classList.add('hidden');
+    }
+
+    function startPixExpirationTimer() {
+      clearInterval(appState.pixTimerInterval);
+      let secondsLeft = 299;
+      const el = document.getElementById('pix-exp-timer');
+      appState.pixTimerInterval = setInterval(() => {
+        if (secondsLeft <= 0) {
+          clearInterval(appState.pixTimerInterval);
+          return;
+        }
+        secondsLeft--;
+        const m = String(Math.floor(secondsLeft / 60)).padStart(2, '0');
+        const s = String(secondsLeft % 60).padStart(2, '0');
+        el.textContent = `${m}:${s}`;
+      }, 1000);
+    }
+
+    function copyPixCode() {
+      const input = document.getElementById('pix-copy-code');
+      input.select();
+      input.setSelectionRange(0, 99999);
+      document.execCommand('copy');
+      showToast('Código Pix copiado para a área de transferência!', '📋');
+    }
+
+    // =========================================================
+    // MÁSCARAS DE ENTRADA E UTILITÁRIOS DE DEMO
+    // =========================================================
+    function maskCPF(input) {
+      let v = input.value.replace(/\D/g, '').substring(0, 11);
+      v = v.replace(/(\d{3})(\d)/, '$1.$2');
+      v = v.replace(/(\d{3})(\d)/, '$1.$2');
+      v = v.replace(/(\d{3})(\d{1,2})$/, '$1-$2');
+      input.value = v;
+    }
+
+    function maskPhone(input) {
+      let v = input.value.replace(/\D/g, '').substring(0, 11);
+      v = v.replace(/^(\d{2})(\d)/g, '($1) $2');
+      v = v.replace(/(\d)(\d{4})$/, '$1-$2');
+      input.value = v;
+    }
+
+    function maskCEP(input) {
+      let v = input.value.replace(/\D/g, '').substring(0, 8);
+      v = v.replace(/^(\d{5})(\d)/, '$1-$2');
+      input.value = v;
+    }
+
+    function fillDemoAccount() {
+      const demoUser = {
+        name: 'Alessandro Silva',
+        cpf: '123.456.789-00',
+        email: 'alessandro@rotapark.com',
+        password: '123',
+        phone: '(37) 99876-5432',
+        cep: '35600-000'
+      };
+      if (!appState.users.some(u => u.email === demoUser.email)) {
+        appState.users.push(demoUser);
+      }
+      appState.currentUser = demoUser;
+      appState.vehicle = {
+        plate: 'RPK2E26',
+        color: 'Prata',
+        model: 'Fiat Argo Drive 1.0',
+        ownerName: demoUser.name,
+        ownerCpf: demoUser.cpf,
+        ownerPhone: demoUser.phone,
+        ownerEmail: demoUser.email,
+        ownerCep: demoUser.cep
+      };
+      navigateTo('screen-home');
+      showToast('Modo Demo ativado! Usuário e veículo prontos.', '⚡');
+    }
+
+    function resetFullApp() {
+      clearInterval(appState.timerInterval);
+      clearInterval(appState.pixTimerInterval);
+      appState.users = [];
+      appState.currentUser = null;
+      appState.vehicle = null;
+      appState.bonusInventory = 1;
+      appState.loyaltyPurchaseCount = 4;
+      appState.activeTicket = null;
+      document.getElementById('active-ticket-banner').classList.add('hidden');
+      document.getElementById('login-email').value = '';
+      document.getElementById('login-password').value = '';
+      navigateTo('screen-login');
+      showToast('Aplicativo reiniciado ao estado inicial.', '🔄');
+    }
+  </script>
+</body>
+</html>
