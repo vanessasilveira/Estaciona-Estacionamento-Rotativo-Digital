@@ -79,9 +79,6 @@
       <span class="font-medium">Protótipo Interativo • Fluxograma</span>
     </div>
     <div class="flex items-center gap-2">
-      <button onclick="fillDemoAccount()" class="px-2.5 py-1 rounded-full bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-700 transition font-medium">
-        ⚡ Demo Rápida
-      </button>
       <button onclick="resetFullApp()" class="px-2.5 py-1 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition">
         Reiniciar
       </button>
@@ -97,10 +94,6 @@
       <!-- Notch decorativo no desktop -->
       <div class="hidden sm:block w-24 h-4 bg-black rounded-full"></div>
       <div class="flex items-center gap-1.5">
-        <!-- Demo button on mobile screens -->
-        <button onclick="fillDemoAccount()" class="sm:hidden text-[10px] bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded-full border border-amber-400/30 mr-1">
-          Demo
-        </button>
         <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M12 21L15.6 16.2C14.6 15.45 13.35 15 12 15C10.65 15 9.4 15.45 8.4 16.2L12 21ZM12 3C7.95 3 4.21 4.34 1.2 6.6L3 9C5.5 7.12 8.62 6 12 6C15.38 6 18.5 7.12 21 9L22.8 6.6C19.79 4.34 16.05 3 12 3ZM12 9C9.3 9 6.81 9.89 4.8 11.4L6.6 13.8C8.1 12.67 9.97 12 12 12C14.03 12 15.9 12.67 17.4 13.8L19.2 11.4C17.19 9.89 14.7 9 12 9Z"/></svg>
         <div class="flex items-center gap-0.5">
           <div class="w-5 h-2.5 border border-white/80 rounded-sm p-[1px] flex items-center">
@@ -1139,12 +1132,6 @@
       const errBox = document.getElementById('login-error');
 
       const foundUser = appState.users.find(u => u.email === email && u.password === password);
-
-      if (!foundUser) {
-        errBox.textContent = 'Credenciais inválidas ou conta não cadastrada. Clique em "Cadastrar" abaixo ou use "Demo Rápida".';
-        errBox.classList.remove('hidden');
-        return;
-      }
 
       errBox.classList.add('hidden');
       appState.currentUser = foundUser;
